@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Character Sheet Maker</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="app-header">
+  <h1 class="app-title">Character Sheet Maker</h1>
+  <p class="app-sub">캐릭터 시트 메이커 - 14가지 디자인으로 만들고 이미지나 HTML로 저장하세요</p>
+</header>
+<main class="app-layout">
+  <section class="app-form" id="form-pane" aria-label="입력 폼">
+    <div id="form-root"></div>
+  </section>
+  <section class="app-preview" id="preview-pane" aria-label="미리보기">
+    <div id="preview-viewport">
+      <div id="preview-frame">
+        <div id="preview-scale"><div id="sheet-mount"></div></div>
+      </div>
+    </div>
+  </section>
+</main>
+<p class="app-status" id="status" role="status" aria-live="polite"></p>
+<script type="module" src="src/app/app.js"></script>
+</body>
+</html>
