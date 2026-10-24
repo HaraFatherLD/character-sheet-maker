@@ -40,6 +40,7 @@ export function sampleCharacter() {
     art: { fit: 'cover', focusX: 50, focusY: 30 },
     artUrl: '',
     iconUrl: '',
+    sheetWidths: {},
     labels: {},
     hidden: [],
     ...sampleExtras(),

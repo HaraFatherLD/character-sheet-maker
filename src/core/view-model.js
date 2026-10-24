@@ -22,6 +22,7 @@ import { resolvePalette } from './palettes.js';
  * @property {{id: string, label: string, value: string}[]} customFields  only entries with a value; empty when `custom` is hidden
  * @property {{id: string, kind: 'text'|'list', title: string, body: string, items: string[]}[]} customBlocks
  * @property {{info: string[], main: string[]}} layout  block order of the block-based designs
+ * @property {Record<string, number>} sheetWidths  sheet width in px the user chose per design id (normalised; a missing id means the design's own width)
  * @property {(key: string) => string} label       the edited label of `key`, else its default label
  * @property {(key: string) => boolean} isHidden   true when the user switched `key` off
  * @property {(templateId: string) => Record<string, string>|null} paletteFor
@@ -66,6 +67,7 @@ export function buildViewModel(data, images) {
     customFields: hidden.has('custom') ? [] : fields.filter((field) => field.value !== ''),
     customBlocks: Array.isArray(data.customBlocks) ? data.customBlocks : [],
     layout: isObject(data.layout) ? data.layout : cloneLayout(DEFAULT_LAYOUT),
+    sheetWidths: isObject(data.sheetWidths) ? data.sheetWidths : {},
     label: (key) => labelFor(labels, key),
     isHidden: (key) => hidden.has(key),
     paletteFor: (templateId) => resolvePalette(templateId, data.palettes, data.accentColor),

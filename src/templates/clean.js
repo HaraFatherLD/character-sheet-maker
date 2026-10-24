@@ -7,7 +7,9 @@ import { areaNode, nameTier } from './blocks.js';
 
 const META = { id: 'clean', size: { w: 1000, h: null, minH: 1000 }, defaultAccent: PALETTE_DEFAULTS.clean.accent };
 
-const CSS = `.cs-clean{display:flex;flex-direction:column;gap:30px;padding:52px 52px 56px;background:var(--c-bg);color:var(--c-text);font-family:${FONT_SANS};font-size:18px;line-height:1.6}
+// The root is a size container: once its content box is 760px wide or less (a sheet about 864px wide, the padding is
+// 104px) the @container rule at the end turns the top row into one column, art above the header and info.
+const CSS = `.cs-clean{display:flex;flex-direction:column;gap:30px;padding:52px 52px 56px;background:var(--c-bg);color:var(--c-text);font-family:${FONT_SANS};font-size:18px;line-height:1.6;container-type:inline-size}
 .cs-clean .cs-top{display:flex;align-items:stretch;gap:40px}
 .cs-clean .cs-art-col{display:flex;flex:0 0 40%;min-width:0}
 .cs-clean .cs-art{position:relative;flex:1;min-height:560px;border-radius:30px;background:var(--c-chip);box-shadow:0 14px 34px color-mix(in srgb,var(--c-title) 14%,transparent)}
@@ -55,7 +57,8 @@ const CSS = `.cs-clean{display:flex;flex-direction:column;gap:30px;padding:52px 
 .cs-clean .cs-tag{padding:6px 16px;border-radius:999px;background:var(--c-chip);color:var(--c-text);font-size:16px;font-weight:700}
 .cs-clean .cs-block-list{display:flex;flex-direction:column;gap:8px}
 .cs-clean .cs-block-list li{position:relative;padding-left:24px;font-size:18px}
-.cs-clean .cs-block-list li::before{content:'';position:absolute;top:.62em;left:4px;width:9px;height:9px;border-radius:50%;background:var(--c-accent)}`;
+.cs-clean .cs-block-list li::before{content:'';position:absolute;top:.62em;left:4px;width:9px;height:9px;border-radius:50%;background:var(--c-accent)}
+@container (max-width:760px){.cs-clean .cs-top{flex-direction:column;gap:30px}.cs-clean .cs-art-col{flex:none;width:100%}.cs-clean .cs-art{min-height:440px}.cs-clean .cs-head-col{flex:none}.cs-clean .cs-stats-bars,.cs-clean .cs-skills{grid-template-columns:minmax(0,1fr)}}`;
 
 function header(vm) {
   return h('header', { class: 'cs-head' },

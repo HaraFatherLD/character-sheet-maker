@@ -4,7 +4,8 @@ import { sampleCharacter } from '../core/sample.js';
 import { buildViewModel } from '../core/view-model.js';
 import { COMMON_CSS } from '../core/common-css.js';
 import { exportHtml } from '../core/export-html.js';
-import { computeOutputSize, resolveBaseSize } from '../core/size.js';
+import { computeOutputSize, effectiveSize, resolveBaseSize } from '../core/size.js';
+import { scaleWrap } from '../core/scale-wrap.js';
 import { safeFilename } from '../core/filename.js';
 import { getTemplate } from '../templates/index.js';
 import { toDom } from './dom.js';
@@ -62,13 +63,14 @@ function saveNow() {
 }
 
 /**
- * Sheet size used for the preview frame, the size readout, the raster viewBox and the output size. Fixed designs
- * return their own size; auto-height designs use the rendered sheet's scrollHeight (unaffected by the preview scale).
+ * Sheet size used for the preview frame, the size readout, the raster viewBox and the output size. It starts from the
+ * size the user's width gives (effectiveSize): fixed designs return that size as it is; auto-height designs use the
+ * rendered sheet's scrollHeight (unaffected by the preview scale) at the chosen width.
  */
 function measuredBase() {
-  const { size } = getTemplate(state.data.template);
+  const eff = effectiveSize(getTemplate(state.data.template), state.data.sheetWidths);
   const node = $('sheet-mount').firstElementChild;
-  return resolveBaseSize(size, node ? node.scrollHeight : undefined);
+  return resolveBaseSize(eff, node ? node.scrollHeight : undefined);
 }
 
 function fitPreview() {
@@ -86,7 +88,8 @@ function fitPreview() {
 function renderPreview() {
   const template = getTemplate(state.data.template);
   try {
-    const tree = toDom(template.render(buildViewModel(state.data, flow.previewImages())), document);
+    const vm = buildViewModel(state.data, flow.previewImages());
+    const tree = toDom(scaleWrap(template.render(vm), effectiveSize(template, state.data.sheetWidths)), document);
     if (appliedCss !== template.id) {
       styleElement.textContent = `${COMMON_CSS}\n${template.css}`;
       appliedCss = template.id;

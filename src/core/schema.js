@@ -2,6 +2,7 @@
 import { DEFAULT_STAT_LABELS, LIMITS, TEMPLATE_IDS, TEXT_FIELDS, cutText, isObject, own } from './schema-base.js';
 import { defaultGenId, normalizeExtras } from './schema-custom.js';
 import { validateImageUrl } from './image-url.js';
+import { toSheetWidth } from './size.js';
 
 export {
   TEMPLATE_IDS, DEFAULT_STAT_LABELS, TEXT_FIELDS, LIMITS, cutText, LABEL_KEYS, HIDEABLE_KEYS, BLOCK_KEYS, DEFAULT_LAYOUT,
@@ -53,6 +54,20 @@ function normUrl(raw) {
   return checked.ok ? checked.value : '';
 }
 
+/**
+ * The chosen sheet width per design: only known design ids (own properties, so prototype keys never count), only finite
+ * numbers, rounded and then kept only within the allowed range. Out-of-range values are dropped, not clamped.
+ */
+function normSheetWidths(raw) {
+  const widths = {};
+  if (!isObject(raw)) return widths;
+  for (const id of TEMPLATE_IDS) {
+    const width = toSheetWidth(own(raw, id));
+    if (width !== null) widths[id] = width;
+  }
+  return widths;
+}
+
 function normStructure(raw) {
   const accent = own(raw, 'accentColor');
   const template = own(raw, 'template');
@@ -64,8 +79,8 @@ function normStructure(raw) {
 }
 
 /**
- * Turn untrusted input into valid CharacterData (v1 data gets the v2 defaults). Never throws; builds a fresh
- * object from whitelisted keys.
+ * Turn untrusted input into valid CharacterData (older data gets the defaults of the fields added later). Never throws;
+ * builds a fresh object from whitelisted keys.
  * @param {unknown} raw
  * @param {{genId?: () => string}} [options] `genId` replaces the random id generator (tests, determinism)
  * @returns {{ok: true, value: object} | {ok: false, error: string}}
@@ -86,6 +101,7 @@ export function normalizeCharacter(raw, options = {}) {
     value.art = normArt(own(raw, 'art'));
     value.artUrl = normUrl(own(raw, 'artUrl'));
     value.iconUrl = normUrl(own(raw, 'iconUrl'));
+    value.sheetWidths = normSheetWidths(own(raw, 'sheetWidths'));
     const genId = isObject(options) && typeof options.genId === 'function' ? options.genId : defaultGenId;
     return { ok: true, value: Object.assign(value, normalizeExtras(raw, genId)) };
   } catch {

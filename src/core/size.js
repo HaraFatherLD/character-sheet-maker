@@ -1,4 +1,4 @@
-// Output size for image export.
+// Sizes: the sheet width the user chose per design, the size that gives, and the size of the exported image.
 
 /** Export presets in UI order. */
 export const PRESETS = ['1x', '2x', '3x', 'custom'];
@@ -6,8 +6,15 @@ export const PRESETS = ['1x', '2x', '3x', 'custom'];
 export const MAX_SIDE = 6000;
 /** Smallest allowed custom width in px. */
 export const MIN_WIDTH = 300;
+/** Narrowest sheet width the user may choose, in px. */
+export const SHEET_WIDTH_MIN = 400;
+/** Widest sheet width the user may choose, in px. */
+export const SHEET_WIDTH_MAX = 2400;
+/** Sheet width presets in UI order: the design's own width, 75% / 125% / 150% of it, or a typed width. */
+export const WIDTH_PRESETS = ['base', '75', '125', '150', 'custom'];
 
 const MULTIPLIERS = { '1x': 1, '2x': 2, '3x': 3 };
+const WIDTH_RATIOS = { 75: 0.75, 125: 1.25, 150: 1.5 };
 
 function parseWidth(value) {
   if (value === null || value === undefined) return null;
@@ -18,9 +25,51 @@ function parseWidth(value) {
 }
 
 /**
- * Sheet size to export. Fixed-height designs return their own size; auto-height designs (`size.h === null`) use the
- * measured height of the rendered sheet, never less than `size.minH`.
- * @param {{w: number, h: number|null, minH?: number}} size template size
+ * A chosen sheet width in whole px: `value` rounded when it is a finite number that is then within
+ * SHEET_WIDTH_MIN..SHEET_WIDTH_MAX, else null. Out-of-range widths are refused, never clamped.
+ * @param {unknown} value
+ * @returns {number|null}
+ */
+export function toSheetWidth(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const width = Math.round(value);
+  return width >= SHEET_WIDTH_MIN && width <= SHEET_WIDTH_MAX ? width : null;
+}
+
+/**
+ * The size a design is drawn at once the user's width is applied. Fixed layouts (`size.h` is a number) keep their
+ * proportions: `scale` is w / size.w and `baseW` / `baseH` are the layout's own size. Block layouts (`size.h` is null)
+ * reflow at the chosen width: `h` is null, `minH` is the design's minimum height and `scale` is 1.
+ * @param {{id: string, size: {w: number, h: number|null, minH?: number}}} template a registry template (or its META)
+ * @param {unknown} [sheetWidths] normalised `{ [templateId]: px }`; anything unusable means "no override"
+ * @returns {{mode: 'scale', w: number, h: number, scale: number, baseW: number, baseH: number}
+ *   | {mode: 'reflow', w: number, h: null, minH: number, scale: 1, baseW: number, baseH: null}}
+ */
+export function effectiveSize(template, sheetWidths) {
+  const { size } = template;
+  const own = sheetWidths && typeof sheetWidths === 'object' && Object.hasOwn(sheetWidths, template.id);
+  const w = (own ? toSheetWidth(sheetWidths[template.id]) : null) ?? size.w;
+  if (typeof size.h !== 'number') return { mode: 'reflow', w, h: null, minH: size.minH, scale: 1, baseW: w, baseH: null };
+  return { mode: 'scale', w, h: Math.round((size.h * w) / size.w), scale: w / size.w, baseW: size.w, baseH: size.h };
+}
+
+/**
+ * The width a preset of the sheet-width control stands for.
+ * @param {number} baseW the design's own width
+ * @param {string} preset one of WIDTH_PRESETS; unknown values behave like 'base'
+ * @returns {number|null} 'base' gives baseW; '75' / '125' / '150' give baseW times the ratio, rounded and then clamped
+ *   to SHEET_WIDTH_MIN..SHEET_WIDTH_MAX; 'custom' gives null (the width is typed)
+ */
+export function presetWidth(baseW, preset) {
+  if (preset === 'custom') return null;
+  if (!Object.hasOwn(WIDTH_RATIOS, preset)) return baseW;
+  return Math.max(SHEET_WIDTH_MIN, Math.min(SHEET_WIDTH_MAX, Math.round(baseW * WIDTH_RATIOS[preset])));
+}
+
+/**
+ * Sheet size to export. Fixed-height designs return their own size; auto-height designs (`h === null`) use the
+ * measured height of the rendered sheet, never less than `minH`.
+ * @param {{w: number, h: number|null, minH?: number}} size an effective size (see effectiveSize) or a template size
  * @param {number} [measuredH] `scrollHeight` of the rendered sheet (ignored unless finite and positive)
  * @returns {{w: number, h: number}}
  */

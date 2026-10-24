@@ -6,6 +6,7 @@ import { h } from '../core/vnode.js';
 import { sampleArt } from '../core/sample-art.js';
 import { TEXT_FIELDS } from '../core/schema.js';
 import { accentInk } from '../core/color.js';
+import { effectiveSize } from '../core/size.js';
 
 export { FONT_SANS, FONT_SERIF, FONT_MONO } from '../core/common-css.js';
 
@@ -27,7 +28,9 @@ export function cls(...names) {
  * The sheet root every template must return: `div.cs-sheet.cs-<id>` with the size, `--accent` and `--accent-ink`
  * (`class` before `style`). Fixed designs get `width` + `height`; auto-height designs (`size.h === null`) get `width` +
  * `min-height` and never a `height`. Block-based designs (clean, vertical) also get all eight `--c-<token>` colours,
- * and their accent is the palette accent, then the user's accent colour, then the default.
+ * and their accent is the palette accent, then the user's accent colour, then the default. An auto-height design's `width`
+ * is the width the user chose for it (`vm.sheetWidths`, see effectiveSize); a fixed design always keeps its own size and
+ * the scale wrapper outside it (scaleWrap) does the resizing.
  * @param {{id: string, size: {w: number, h: number|null, minH?: number}, defaultAccent: string}} meta the template's own id/size/defaultAccent
  * @param {object} vm
  * @param {...unknown} children
@@ -37,9 +40,10 @@ export function sheet(meta, vm, ...children) {
   const palette = vm.paletteFor(meta.id);
   const accent = palette ? palette.accent : vm.accentColor || meta.defaultAccent;
   const { w, h: fixedHeight, minH } = meta.size;
+  const fixed = typeof fixedHeight === 'number';
   const style = {
-    width: `${w}px`,
-    ...(typeof fixedHeight === 'number' ? { height: `${fixedHeight}px` } : { 'min-height': `${minH}px` }),
+    width: `${fixed ? w : effectiveSize(meta, vm.sheetWidths).w}px`,
+    ...(fixed ? { height: `${fixedHeight}px` } : { 'min-height': `${minH}px` }),
     '--accent': accent,
     '--accent-ink': accentInk(accent),
   };

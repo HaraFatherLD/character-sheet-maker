@@ -152,3 +152,51 @@
 
 ### 미검증 (브라우저 필요, AP-043)
 - 실제 CORS 허용/거부 사이트에서의 미리보기 표시, canvas 변환(createImageBitmap/toDataURL), 내려받은 HTML을 열었을 때의 CSP 동작, 새로고침 후 복원, 390px 폭 레이아웃.
+
+## v4 — 시트 가로 폭 (2026-10-25)
+> 유형: Type B | 사용자 승인: 고정 레이아웃은 비율 유지 확대·축소, 400~2400px | SPEC v4 + (v4 rev.2) 우선 | 브라우저 미사용, 설치·커밋 없음
+
+### 판별식 상태 (v4)
+| AP ID | 설명 | 유형 | 상태 | 시도 | 최근 실패 사유 |
+|-------|------|------|------|------|--------------|
+| AP-044 | sheetWidths 정규화 (2 tests) | Auto | ✅ pass | 1 | — |
+| AP-045 | effectiveSize · resolveBaseSize 연동 (4) | Auto | ✅ pass | 1 | — |
+| AP-046 | scaleWrap · exportHtml 래퍼/@page/reflow 폭 (3) | Auto | ✅ pass | 1 | — |
+| AP-047 | clean 컨테이너 쿼리 (1) | Auto | ✅ pass | 1 | — |
+| AP-048 | presetWidth (1) | Auto | ✅ pass | 1 | — |
+| AP-049 | 14종 실측 크기 · HTML/이미지 저장 크기 · clean 1단 · 새로고침 · 390px | Semi | ⏳ 브라우저 필요(메인 세션) | 0 | — |
+| AP-050 | 배포 반영 | Semi | ⏳ 배포 후 | 0 | — |
+보강 테스트(저장소 신규, 제공 테스트는 수정하지 않음): `test/ap-049b.test.js`(5: toSheetWidth 경계, 14종 루트 폭 규칙, 14종 HTML 내보내기, 래스터 SVG 2개), `test/ap-049c.test.js`(3: 폭 컨트롤을 가짜 DOM에서 구동).
+
+### 현재 상태 (v4)
+- Iteration: 1 (같은 회차 안에서 자체 수정 2건)
+- 통과율: Auto AP 5/5 (100%), `npm test` 163/163 (시작 시 150개 중 7 실패)
+- 에스컬레이션: 없음
+
+### 루프 히스토리 (v4)
+#### Iteration 1
+- 구현:
+  - core: `size.js`(SHEET_WIDTH_MIN/MAX, WIDTH_PRESETS, `toSheetWidth`, `effectiveSize`, `presetWidth`; `resolveBaseSize`는 로직 변경 없이 유효 크기 객체를 그대로 받음), `scale-wrap.js` 신규(`scaleWrap`, `isScaled`), `schema.js`(`normSheetWidths`: 알려진 id만 own 속성으로 읽고 round 후 범위 밖은 제거), `sample.js`, `view-model.js`(`vm.sheetWidths`), `export-html.js`(scaleWrap, effectiveSize 기반 fitCss/@page, 프레임 CSS).
+  - templates: `parts.js` `sheet()`(reflow 템플릿만 `effectiveSize(meta, vm.sheetWidths).w`, 고정형은 기본 루트 크기), `clean.js`(`container-type:inline-size` + `@container (max-width:760px)`).
+  - app: `app.js`(`measuredBase`가 유효 크기 기준, 미리보기 `scaleWrap`), `raster.js`(`buildRasterSvg`가 래핑된 트리를 그리고 viewBox/foreignObject = 유효·측정 크기, width/height = 출력 크기), `form-width.js` 신규(프리셋 select · 숫자 입력 · [기본 폭] · 크기 표시 · 오류 메시지), `form.js`(디자인 패널에 연결), `style.css`(`.hint-error`, `.panel-subtitle`).
+- /verify: PASS — `npm test` `# tests 163 / # pass 163 / # fail 0`, check-size / check-no-html-sink / audit-v2 exit 0, 최장 함수 42줄(sample.js), 최대 파일 parts.js 253줄
+- AP 평가: AP-044 ✅ AP-045 ✅ AP-046 ✅ AP-047 ✅ AP-048 ✅ / AP-049 ⏳ AP-050 ⏳ (둘 다 브라우저·배포 필요)
+- 통과율: 5/5 Auto (163/163 tests)
+- 자체 수정: (1) 처음 쓴 `buildWidthControls`가 50줄을 넘어(약 66줄) 실행 전에 `createParts`/`makeShow`/`wire`로 분리. (2) `ap-049c`에 넣었던 의미 없는 단언 한 줄을 실제 값 검사로 교체.
+- 제공 테스트와 SPEC의 모순: 없음.
+
+### 결정·메모 (v4, 후속 에이전트용)
+- [K] `ap-046`은 기본 폭·reflow 내보내기 HTML 전체에 `cs-scale-frame` 문자열이 없어야 한다고 단언한다. 그래서 `.cs-scale-frame{flex:none}`와 프레임 그림자는 **래퍼가 있을 때만** `<style>`에 쓴다(`FRAME_CSS`, 조건은 `isScaled(eff)`). 미리보기·래스터에는 flex 부모가 없어 이 CSS가 필요 없다.
+- [K] `toSheetWidth`가 폭 검증의 단일 출처다: 스키마 정규화, `effectiveSize`, UI 입력 검사가 같은 함수를 쓴다(round 후 범위 확인, clamp 없음). 프리셋(%) 값만 `presetWidth`에서 clamp한다.
+- [K] 시트 폭은 `vm.sheetWidths`로만 흐른다(`buildViewModel`은 템플릿 id를 모름). `buildRasterSvg(template, vm, out, base)`도 vm에서 `effectiveSize`를 계산하고, `base` 생략 시 `resolveBaseSize(eff)`를 쓴다. 이전의 `base = template.size` 기본값은 reflow에서 `h:null`이 되어 제거했다.
+- [K] HTML 내보내기의 화면 맞춤 `zoom` 단계를 0.2에서 0.05까지(k=19..1)로 늘렸다. 2400px 시트가 390px 폰에서 가로 스크롤 없이 맞도록 하기 위함(0.2배로는 480px).
+- [I] SPEC은 clean의 상단 1단만 명시했지만, 같은 `@container` 블록 안에서 능력치 막대·스킬의 2열도 1열로 접었다. 400px 폭에서 막대 폭이 0이 되는 것을 막기 위함이며, 쿼리 밖(864px 초과)에서는 달라지는 것이 없다.
+- [K] UI 상태는 저장값에서 유도한다: 키 없음 → 기본, 기본 폭 × 75/125/150%와 같으면 그 프리셋, 아니면 직접 입력. "직접 입력"을 고르거나 숫자를 입력하면 그 디자인 id를 `typing`에 넣어, 입력한 값이 프리셋 값과 같아도 입력칸이 비활성화되지 않게 한다. 입력칸이 포커스를 가진 동안에는 값을 다시 쓰지 않는다. [기본 폭]은 키를 삭제한다.
+- 앱 계층 테스트(`ap-049c`)는 `test/app-helpers.js`의 `FakeNode`를 쓴다. `FakeNode`에는 `focus/select/blur`가 없어 테스트에서 인스턴스에 빈 함수를 붙인다.
+
+### 미검증 (브라우저 필요, AP-049)
+- 14종에서 폭을 바꿨을 때 미리보기 시트의 실제 크기, HTML 저장 크기, 이미지 저장 픽셀이 `effectiveSize`와 일치하는지.
+- 래스터 경로의 선명도: foreignObject 안의 `transform:scale()` + viewBox 확대가 2x/3x에서 흐려지지 않는지(코드상 viewBox와 width/height 비율은 일치).
+- clean의 1단 전환 경계(시트 폭 약 864px)와, `zoom`이 걸린 HTML 내보내기에서 컨테이너 쿼리가 같은 경계로 평가되는지.
+- 새로고침 후 폭 유지, 390px 모바일에서 폭 컨트롤 배치·오류 메시지, 2400px 시트의 미리보기 맞춤 축소.
+- `/code-review`는 메인 세션 몫이라 실행하지 않았다.

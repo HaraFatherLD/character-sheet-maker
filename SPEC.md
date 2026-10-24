@@ -288,3 +288,39 @@ output/character-sheet-maker/   ← 독립 git 저장소 = Pages 루트 (main, /
 - (rev.2) **래스터 가드**: `raster.js`의 진입 함수는 vm의 이미지 src가 모두 data URL(또는 null)이 아니면 즉시 실패를 반환(조용한 빈칸 방지). 이미지(PNG/JPEG) 저장은 내보내기 모드 선택과 무관하게 항상 URL 이미지를 data URL로 변환해서 사용. 순수 가드 함수 `assertRasterImages(images)`(→ `{ok}`)를 `src/core/`에 두고 테스트(`test/ap-043.test.js`).
 - (rev.2) URL → data URL 변환: `fetch(url, { mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer' })`, 응답 Content-Type이 image/jpeg·png·webp가 아니거나 20 MiB 초과면 실패, 이후 기존 업로드와 같은 해상도 검사·축소.
 - (rev.2) URL 로드 실패 시 입력값·저장값은 유지, 이미지 칸은 이전 이미지 또는 내장 일러스트/엠블럼, 오류 문구 표시. ap-002의 `V2_DEFAULTS`에 `artUrl:''`, `iconUrl:''` 포함으로 갱신.
+
+---
+
+# v4 — 시트 가로 폭 조절 (2026-10-25, 사용자 승인: 고정 레이아웃은 비율 유지 확대·축소, 400~2400px, 완료 후 배포)
+
+## 데이터
+- `sheetWidths`: `{ [templateId]: number }`. 비객체 → `{}`. 키는 `TEMPLATE_IDS`만 own-property로 읽음. 값은 `typeof number`·유한수만, `Math.round` 후 `[400, 2400]`이 아니면 키 제거(clamp 아님). 그 외 → 키 제거. 기존 데이터 → `{}`.
+- 상수(size.js): `SHEET_WIDTH_MIN = 400`, `SHEET_WIDTH_MAX = 2400`.
+
+## 실제 적용 크기 (`size.js`, 순수)
+`effectiveSize(template, sheetWidths)` →
+- 폭 `w` = `sheetWidths[template.id]`(유효할 때) 또는 `template.size.w`.
+- **고정 레이아웃**(`size.h`가 수): `{ mode: 'scale', w, h: Math.round(size.h * w / size.w), scale: w / size.w, baseW: size.w, baseH: size.h }`.
+- **블록형**(`size.h === null`): `{ mode: 'reflow', w, h: null, minH: size.minH, scale: 1, baseW: w, baseH: null }`.
+- `resolveBaseSize`는 이 결과를 받는다: scale 모드는 `{w, h}` 그대로, reflow 모드는 기존 규칙(측정 높이, minH 하한).
+
+## 렌더
+- **reflow 템플릿**: `sheet()` 루트 style의 `width`가 `effectiveSize().w`(vm에 `vm.sheetWidth`로 전달). 고정 템플릿 루트는 기존 기본 크기 그대로.
+- **scale 래퍼**(`src/core/scale-wrap.js`, 순수): `scaleWrap(sheetVNode, eff)` — `eff.mode === 'scale' && eff.scale !== 1`이면
+  `<div class="cs-scale-frame" style="width:{w}px;height:{h}px;overflow:hidden"><div class="cs-scale-inner" style="width:{baseW}px;height:{baseH}px;transform:scale({scale});transform-origin:0 0">{sheet}</div></div>`,
+  아니면 시트를 그대로 반환. scale 값은 소수 4자리까지(`Number(scale.toFixed(4))`).
+- 미리보기·HTML 내보내기·이미지 저장 세 경로 모두 `scaleWrap(render(vm), eff)`를 사용한다. 미리보기 화면 맞춤 축소는 래퍼 바깥(기존 방식)에서 계속 적용.
+- **HTML 내보내기**: 화면 맞춤(fitCss)·`@page`·인쇄 크기는 `effectiveSize` 기준(reflow는 w × minH).
+- **이미지 저장**: 래스터 viewBox와 출력 크기 계산의 base = `resolveBaseSize(effectiveSize(...), 측정 높이)`. 1x = 바뀐 폭 기준.
+- **깔끔한 양식(clean)**: 루트에 `container-type:inline-size`, `@container (max-width:760px)`에서 상단(일러스트+정보) 2단 → 1단(일러스트 위, 정보 아래). 세로형은 원래 1단이라 변경 없음.
+
+## UI
+- 디자인 패널에 "시트 가로 폭": 프리셋 select(기본 / 75% / 125% / 150% / 직접 입력) + 숫자 입력(400~2400, 직접 입력일 때만 활성) + [기본 폭] 버튼 + 현재 크기 표시(예: "1200 × 1697 px", reflow는 "800 px × 자동").
+- 프리셋 % 값은 기본 폭 × 비율을 반올림한 뒤 [400, 2400]으로 clamp.
+- 값은 디자인별로 저장(sheetWidths), [기본 폭]은 해당 키 삭제.
+
+## 테스트
+- `test/ap-044.test.js` sheetWidths 정규화, `ap-045` effectiveSize·resolveBaseSize 연동, `ap-046` scaleWrap·exportHtml 래퍼/print/reflow 폭, `ap-047` clean 컨테이너 쿼리, `ap-048` UI 프리셋 계산 순수 함수 `presetWidth(baseW, preset)`.
+- (v4 rev.2) vm에는 `vm.sheetWidths`(정규화된 객체)를 넘기고 `sheet()`가 `vm.sheetWidths[meta.id]`를 조회해 reflow 템플릿의 루트 width를 정한다(buildViewModel은 템플릿 id를 모름). `sampleCharacter()`는 `sheetWidths:{}` 포함.
+- (v4 rev.2) `.cs-scale-frame{flex:none}`(미리보기 flex 안에서 줄어들지 않게). 미리보기 맞춤 축소는 `resolveBaseSize(effectiveSize(...), 측정 높이)` 기준.
+- (v4 rev.2) clean의 `@container (max-width:760px)`는 컨테이너 content box 기준이므로 실제로는 시트 폭 약 864px 이하(좌우 패딩 104px 제외)에서 1단이 된다. AP-049는 이 기준으로 확인.

@@ -76,4 +76,14 @@
 - [x] `AP-042` (≥4): exportHtml imageMode — embed CSP `img-src data:`·원격 이미지 거부·미지 모드=embed, link CSP `img-src data: https:`·14종 모두 ok, https는 img src·CSP에만, 위험 값 거부 — `test/ap-042.test.js`
 - [x] `AP-043b` (Auto, rev.2): assertRasterImages — `test/ap-043.test.js`
 - [x] `AP-043` (Semi): URL 일러스트·아이콘 → 미리보기 반영; "파일에 포함" HTML·이미지 저장은 CORS 허용 URL에서 성공, 거부 URL에서 안내 후 중단; "링크 유지" HTML은 거부 URL에서도 성공하고 열면 이미지 표시; 새로고침 후 URL 유지
-- [ ] `AP-044` (Semi): 배포 URL 200
+- [x] `AP-044` (Semi): 배포 URL 200
+
+---
+# v4 Acceptance Predicates — 시트 가로 폭
+- [x] `AP-044` (≥2): sheetWidths 정규화 — 미지 템플릿·비수·NaN·범위 밖(399, 2401) 제거, 반올림, `__proto__` 안전, 기존 데이터 `{}` — `test/ap-044.test.js`
+- [x] `AP-045` (≥3): effectiveSize 리터럴(fantasy 1200→1200×1697 scale 1.2, tcg 400→400×560, magazine 2400→2400×1500, clean 800→reflow w800 minH1000, 오버라이드 없음→기본) + resolveBaseSize 연동 — `test/ap-045.test.js`
+- [x] `AP-046` (≥3): scaleWrap(scale≠1일 때만, 정확한 style), exportHtml에 래퍼·@page 크기, clean 루트 width 800px·래퍼 없음, 기본 폭이면 래퍼 없음 — `test/ap-046.test.js`
+- [x] `AP-047` (≥1): clean CSS에 `container-type:inline-size`와 `@container (max-width:760px)` — `test/ap-047.test.js`
+- [x] `AP-048` (≥1): presetWidth — 기본/75/125/150% 반올림·clamp — `test/ap-048.test.js`
+- [x] `AP-049` (Semi): 14종에서 폭 변경 → 미리보기 시트 실제 크기·HTML 저장 크기·이미지 저장 픽셀이 effectiveSize와 일치; clean 760px 이하 1단; 새로고침 유지; 390px 모바일
+- [ ] `AP-050` (Semi): 배포 반영

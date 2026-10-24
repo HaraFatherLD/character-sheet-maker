@@ -8,6 +8,7 @@ import { buildMediaSections } from './form-media.js';
 import { buildItemSections } from './form-items.js';
 import { buildBlockSection } from './form-blocks.js';
 import { buildColorSection } from './form-colors.js';
+import { buildWidthControls } from './form-width.js';
 
 function designSection(ctx, reg) {
   const buttons = TEMPLATES.map((template) => el('button', {
@@ -17,7 +18,8 @@ function designSection(ctx, reg) {
   reg.refresh.push(() => {
     for (const button of buttons) button.setAttribute('aria-pressed', String(button.dataset.template === ctx.state.data.template));
   });
-  return section('디자인', el('div', { class: 'design-grid', role: 'group', 'aria-label': '디자인 선택' }, buttons));
+  return section('디자인', el('div', { class: 'design-grid', role: 'group', 'aria-label': '디자인 선택' }, buttons),
+    ...buildWidthControls(ctx, reg));
 }
 
 function looksSection(ctx, reg) {
