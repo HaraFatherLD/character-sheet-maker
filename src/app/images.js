@@ -1,6 +1,6 @@
 // Image upload pipeline: validate -> read header size -> decode -> downscale -> data URL. A failure never touches the previous image.
 import { validateImageFile } from '../core/schema.js';
-import { isImageSrc } from '../core/vnode.js';
+import { isDataImageSrc } from '../core/vnode.js';
 import { isImageTooLarge, readImageSize } from '../core/image-size.js';
 
 /** Longest side kept for the main illustration (px). */
@@ -76,7 +76,7 @@ export async function loadImageFile(file, maxSide) {
     context.imageSmoothingQuality = 'high';
     context.drawImage(decoded.source, 0, 0, size.width, size.height);
     const dataUrl = canvas.toDataURL(file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png', 0.92);
-    if (!isImageSrc(dataUrl)) throw new Error('image encoding failed');
+    if (!isDataImageSrc(dataUrl)) throw new Error('image encoding failed');
     return { ok: true, dataUrl, width: size.width, height: size.height };
   } catch (error) {
     console.warn('image load failed', error);

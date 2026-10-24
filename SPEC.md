@@ -255,3 +255,36 @@ output/character-sheet-maker/   ← 독립 git 저장소 = Pages 루트 (main, /
 - **비객체 layout 복구**: layout이 비객체여도 `{info:[], main:[]}`에서 출발해 기본 섹션·customBlock 보충 단계를 똑같이 수행한다(사용자 블록이 배치에서 빠지지 않음).
 - **6000 상한 우선**: `computeOutputSize`의 최소 폭은 `min(MIN_WIDTH, maxWidth)` — 긴 변 6000 상한이 300px 최소 폭보다 우선.
 - vnode 문자열 속성 금지 패턴 검사는 `class`·`alt`를 제외한다(값은 항상 이스케이프되며 CSS·URL로 해석되지 않음).
+
+---
+
+# v3 — 이미지 URL 등록 (2026-10-25, 사용자 승인: 두 사이트 적용, HTML 기본 "파일에 포함", 완료 후 배포)
+
+## 공통 URL 검증 (`src/core/image-url.js`, 순수)
+`validateImageUrl(input)` → `{ok:true, value: href}` | `{ok:false, error}`, throw 안 함:
+- 문자열이 아니면 실패. 앞뒤 공백 trim 후 길이 1–2048.
+- trim 후에도 공백·제어문자(`[\s\u0000-\u001f\u007f]`) 포함 시 실패.
+- `new URL()` 파싱 실패 → 실패. `protocol === 'https:'`만 허용(http, javascript, data, blob, file 등 거부).
+- `username`/`password` 있으면 실패, `hostname` 비면 실패.
+- 성공 값은 `URL#href`(정규화된 문자열).
+
+## 이미지 우선순위·UI
+- 각 이미지 칸에 [파일 업로드] / [이미지 URL] 입력. 파일을 올리면 그 칸의 URL은 지워지고, URL을 적용하면 업로드 이미지는 해제된다. 메모리의 업로드 이미지가 URL보다 우선.
+- URL 이미지는 `crossOrigin = 'anonymous'`로 로드. 로드 실패(CORS 거부·404·형식 오류) → "이 이미지는 원본 사이트가 외부 사용을 허용하지 않거나 열 수 없습니다. 파일로 업로드해 주세요"(문구 조정 가능) 표시, 기존 이미지 유지.
+- URL은 데이터에 저장(localStorage)되어 새로고침 후 다시 로드된다. 업로드 파일은 기존처럼 저장하지 않음.
+
+## 캐릭터 시트 전용
+- `CharacterData`에 `artUrl`, `iconUrl` 추가(규칙은 학생증 photoUrl과 동일, 무효 → `''`).
+- **vnode src 규칙 확장**: `src`는 (a) 기존 `data:image/(png|jpeg|webp);base64,…` 또는 (b) `validateImageUrl(src).ok && .value === src`인 https URL. 그 외 throw. `toHtml`·`toXhtml`·`toDom` 공통.
+- view-model의 `images.art`/`images.icon`은 data URL 또는 https URL(검증된 값) 또는 null. 앱은 업로드 이미지 > URL 순으로 결정.
+- **HTML 내보내기 옵션** `exportHtml(data, images, template, { imageMode })`, `imageMode` = `'embed'`(기본) | `'link'`:
+  - `embed`: 이미지가 모두 data URL이어야 함. https URL이 남아 있으면 `{ok:false}`(앱이 먼저 URL 이미지를 data URL로 변환해서 넘김). CSP meta `default-src 'none'; style-src 'unsafe-inline'; img-src data:`.
+  - `link`: data URL과 검증된 https URL 허용. CSP meta `default-src 'none'; style-src 'unsafe-inline'; img-src data: https:`.
+  - 두 모드 모두 `<script`, `<link`, `@import`, CSS `url(` 금지 유지. `https:`는 오직 `<img src="...">` 속성값과 CSP meta 안에만 등장할 수 있다.
+  - 미지 imageMode → `'embed'`.
+- **앱**: 내보내기 영역에 "이미지: 파일에 포함 / 링크 유지" 선택(기본 파일에 포함). 파일에 포함·이미지(PNG/JPEG) 저장 시 URL 이미지는 `fetch(url, {mode:'cors'})` → Blob → 기존 업로드와 같은 축소·data URL 변환을 거친 뒤 사용. 변환 실패 → "원본 사이트가 외부 저장을 허용하지 않아 포함할 수 없습니다. '링크 유지'를 선택하거나 파일로 업로드해 주세요" 표시, 다운로드 중단. 이미지 저장(래스터)은 항상 변환된 data URL 사용(SVG 이미지 안에서는 외부 이미지가 로드되지 않음 [K]).
+- 테스트: `test/ap-039.test.js`(validateImageUrl), `test/ap-040.test.js`(schema URL 필드), `test/ap-041.test.js`(vnode src 확장), `test/ap-042.test.js`(exportHtml 모드·CSP·금지 패턴).
+- (rev.2) CSP meta 정확한 형식: `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">`(embed) / `... img-src data: https:">`(link) — `<head>` 안, `<style>`보다 앞, 정확히 1개.
+- (rev.2) **래스터 가드**: `raster.js`의 진입 함수는 vm의 이미지 src가 모두 data URL(또는 null)이 아니면 즉시 실패를 반환(조용한 빈칸 방지). 이미지(PNG/JPEG) 저장은 내보내기 모드 선택과 무관하게 항상 URL 이미지를 data URL로 변환해서 사용. 순수 가드 함수 `assertRasterImages(images)`(→ `{ok}`)를 `src/core/`에 두고 테스트(`test/ap-043.test.js`).
+- (rev.2) URL → data URL 변환: `fetch(url, { mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer' })`, 응답 Content-Type이 image/jpeg·png·webp가 아니거나 20 MiB 초과면 실패, 이후 기존 업로드와 같은 해상도 검사·축소.
+- (rev.2) URL 로드 실패 시 입력값·저장값은 유지, 이미지 칸은 이전 이미지 또는 내장 일러스트/엠블럼, 오류 문구 표시. ap-002의 `V2_DEFAULTS`에 `artUrl:''`, `iconUrl:''` 포함으로 갱신.

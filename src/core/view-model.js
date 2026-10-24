@@ -15,8 +15,8 @@ import { resolvePalette } from './palettes.js';
  * @property {{label: string, percent: number, score: number, value: number, max: number, text: string, ratio: number}[]} stats
  *   always 6; `text` is the display string for the current mode ("72" or "16 (+3)"), `ratio` is value/max in 0..1
  * @property {{src: string|null, fit: string, focusX: number, focusY: number, style: Record<string,string>}} art
- *   `src` is a validated data URL or null; `style` holds object-fit / object-position for the <img>
- * @property {{src: string|null, glyph: string}} icon  uploaded icon src or null; `glyph` is the emblem character
+ *   `src` is a validated data URL, a validated https URL or null; `style` holds object-fit / object-position for the <img>
+ * @property {{src: string|null, glyph: string}} icon  icon src (data URL or validated https URL) or null; `glyph` is the emblem character
  * @property {Record<string, string>} labels   user-edited item names (only the keys the user changed)
  * @property {string[]} hidden                 keys the user switched off
  * @property {{id: string, label: string, value: string}[]} customFields  only entries with a value; empty when `custom` is hidden
@@ -36,7 +36,7 @@ function labelFor(labels, key) {
 /**
  * Build the view model for rendering.
  * @param {object} data normalised CharacterData
- * @param {{art?: string|null, icon?: string|null}} [images] data URLs; anything failing the src rule is treated as absent
+ * @param {{art?: string|null, icon?: string|null}} [images] data URLs or validated https URLs; anything failing the src rule is treated as absent
  * @returns {ViewModel}
  */
 export function buildViewModel(data, images) {

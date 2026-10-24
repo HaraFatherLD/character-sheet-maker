@@ -26,9 +26,9 @@ test('AP-006 forbidden attributes throw', () => {
   }
 });
 
-test('AP-006 src accepts only base64 png/jpeg/webp data URLs', () => {
+test('AP-006 src accepts base64 png/jpeg/webp data URLs (validated https URLs are covered by AP-041)', () => {
   assert.match(toHtml(h('img', { src: PNG, alt: 'a' })), /^<img src="data:image\/png;base64,[^"]+" alt="a">$/);
-  for (const src of ['https://x/y.png', 'javascript:alert(1)', 'data:image/svg+xml;base64,AAAA', 'data:text/html;base64,AAAA', `${PNG}\n`, '']) {
+  for (const src of ['http://x/y.png', 'javascript:alert(1)', 'data:image/svg+xml;base64,AAAA', 'data:text/html;base64,AAAA', `${PNG}\n`, '']) {
     assert.throws(() => toHtml(h('img', { src })), Error, src);
   }
 });

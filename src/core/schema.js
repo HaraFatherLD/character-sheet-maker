@@ -1,6 +1,7 @@
 // CharacterData schema: normalisation of untrusted input (localStorage, forms) and image-file validation.
 import { DEFAULT_STAT_LABELS, LIMITS, TEMPLATE_IDS, TEXT_FIELDS, cutText, isObject, own } from './schema-base.js';
 import { defaultGenId, normalizeExtras } from './schema-custom.js';
+import { validateImageUrl } from './image-url.js';
 
 export {
   TEMPLATE_IDS, DEFAULT_STAT_LABELS, TEXT_FIELDS, LIMITS, cutText, LABEL_KEYS, HIDEABLE_KEYS, BLOCK_KEYS, DEFAULT_LAYOUT,
@@ -46,6 +47,12 @@ function normArt(raw) {
   return { fit: own(art, 'fit') === 'contain' ? 'contain' : 'cover', focusX: normInt(own(art, 'focusX'), 0, 100, 50), focusY: normInt(own(art, 'focusY'), 0, 100, 30) };
 }
 
+/** A stored image address: the normalised https URL, or '' when it is missing or invalid (never an error). */
+function normUrl(raw) {
+  const checked = validateImageUrl(raw);
+  return checked.ok ? checked.value : '';
+}
+
 function normStructure(raw) {
   const accent = own(raw, 'accentColor');
   const template = own(raw, 'template');
@@ -77,6 +84,8 @@ export function normalizeCharacter(raw, options = {}) {
     value.stats = DEFAULT_STAT_LABELS.map((label, i) => normStat(Array.isArray(stats) ? stats[i] : undefined, label));
     value.skills = normSkills(own(raw, 'skills'));
     value.art = normArt(own(raw, 'art'));
+    value.artUrl = normUrl(own(raw, 'artUrl'));
+    value.iconUrl = normUrl(own(raw, 'iconUrl'));
     const genId = isObject(options) && typeof options.genId === 'function' ? options.genId : defaultGenId;
     return { ok: true, value: Object.assign(value, normalizeExtras(raw, genId)) };
   } catch {

@@ -1,6 +1,6 @@
-// Standalone HTML export: one document, no scripts, no external resources.
+// Standalone HTML export: one document, no scripts. Pictures are embedded (default) or, on request, linked over https.
 import { escapeHtml } from './escape.js';
-import { isImageSrc, toHtml } from './vnode.js';
+import { isDataImageSrc, isHttpsImageSrc, isImageSrc, toHtml } from './vnode.js';
 import { normalizeCharacter } from './schema.js';
 import { buildViewModel } from './view-model.js';
 import { COMMON_CSS } from './common-css.js';
@@ -8,6 +8,13 @@ import { COMMON_CSS } from './common-css.js';
 const PAGE_CSS = 'html,body{margin:0;padding:0;background:#20232b}\n'
   + '.cs-stage{display:flex;justify-content:center;padding:12px 0}\n'
   + '.cs-stage .cs-sheet{flex:none;box-shadow:0 8px 40px rgba(0,0,0,.45)}';
+
+/** Content-Security-Policy per image mode: inline styles only and nothing else may load; `link` also lets https images in. */
+const CSP = {
+  embed: "default-src 'none'; style-src 'unsafe-inline'; img-src data:",
+  link: "default-src 'none'; style-src 'unsafe-inline'; img-src data: https:",
+};
+const IMAGE_SLOTS = [['art', '일러스트'], ['icon', '아이콘']];
 
 /** Step-wise zoom so the fixed-size sheet fits narrow screens without scripts (largest step that fits the viewport). */
 function fitCss({ w }) {
@@ -25,19 +32,24 @@ function printCss({ w, h, minH }) {
     + '.cs-sheet{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
 }
 
-function assemble(vm, template, sheet) {
+function assemble(vm, template, sheet, mode) {
   const title = vm.name ? `${vm.name} - 캐릭터 시트` : '캐릭터 시트';
   const css = [COMMON_CSS, PAGE_CSS, template.css, fitCss(template.size), printCss(template.size)].join('\n');
   return `<!doctype html>\n<html lang="ko">\n<head>\n<meta charset="utf-8">\n`
     + `<meta name="viewport" content="width=device-width, initial-scale=1">\n`
+    + `<meta http-equiv="Content-Security-Policy" content="${CSP[mode]}">\n`
     + `<title>${escapeHtml(title)}</title>\n<style>\n${css}\n</style>\n</head>\n`
     + `<body>\n<div class="cs-stage">${sheet}</div>\n</body>\n</html>\n`;
 }
 
-function badImage(images) {
-  for (const [key, label] of [['art', '일러스트'], ['icon', '아이콘']]) {
+/** First picture the mode cannot accept, as an error message; null when all are fine. `embed` takes data URLs only. */
+function badImage(images, mode) {
+  const accepts = mode === 'link' ? isImageSrc : isDataImageSrc;
+  for (const [key, label] of IMAGE_SLOTS) {
     const src = images[key];
-    if (src !== null && src !== undefined && !isImageSrc(src)) return `${label} 이미지 형식이 올바르지 않습니다.`;
+    if (src === null || src === undefined || accepts(src)) continue;
+    if (isHttpsImageSrc(src)) return `${label} 이미지는 웹 주소라서 파일에 포함할 수 없습니다.`;
+    return `${label} 이미지 형식이 올바르지 않습니다.`;
   }
   return null;
 }
@@ -45,19 +57,23 @@ function badImage(images) {
 /**
  * Build the standalone HTML document for a character. Never throws.
  * @param {unknown} data CharacterData (normalised again here, so raw storage data is fine)
- * @param {{art?: string|null, icon?: string|null}|null} images validated data URLs or null; an invalid src is an error, not ignored
+ * @param {{art?: string|null, icon?: string|null}|null} images data URLs, plus validated https URLs in `link` mode;
+ *   an invalid src, or a remote one in `embed` mode, is an error and is not ignored
  * @param {{render: Function, css: string, size: {w: number, h: number}}} template a registry template
+ * @param {{imageMode?: 'embed'|'link'}} [options] `embed` (default, and what any unknown value means) needs embedded
+ *   pictures and carries a CSP that allows data images only; `link` also keeps https pictures and allows them in the CSP
  * @returns {{ok: true, html: string} | {ok: false, error: string}}
  */
-export function exportHtml(data, images, template) {
+export function exportHtml(data, images, template, options) {
   try {
+    const mode = options?.imageMode === 'link' ? 'link' : 'embed';
     const norm = normalizeCharacter(data);
     if (!norm.ok) return { ok: false, error: norm.error };
     const imgs = images || {};
-    const problem = badImage(imgs);
+    const problem = badImage(imgs, mode);
     if (problem) return { ok: false, error: problem };
     const vm = buildViewModel(norm.value, imgs);
-    return { ok: true, html: assemble(vm, template, toHtml(template.render(vm))) };
+    return { ok: true, html: assemble(vm, template, toHtml(template.render(vm)), mode) };
   } catch (error) {
     return { ok: false, error: `HTML을 만들지 못했습니다: ${error instanceof Error ? error.message : String(error)}` };
   }

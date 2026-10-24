@@ -1,4 +1,4 @@
-// Application controller: state, live preview, autosave, uploads and exports.
+// Application controller: state, live preview, autosave and exports. The pictures live in image-flow.js.
 import { normalizeCharacter } from '../core/schema.js';
 import { sampleCharacter } from '../core/sample.js';
 import { buildViewModel } from '../core/view-model.js';
@@ -9,13 +9,13 @@ import { safeFilename } from '../core/filename.js';
 import { getTemplate } from '../templates/index.js';
 import { toDom } from './dom.js';
 import { buildForm } from './form.js';
-import { ART_MAX_SIDE, ICON_MAX_SIDE, loadImageFile } from './images.js';
+import { createImageFlow } from './image-flow.js';
 import { rasterize } from './raster.js';
 import { downloadBlob, downloadText } from './download.js';
 
 const STORAGE_KEY = 'character-sheet-maker:v1';
 const IMAGE_FAIL = '이미지 저장에 실패했습니다. HTML 다운로드를 이용해 주세요';
-const IMAGE_LABELS = { art: '일러스트', icon: '아이콘' };
+const HTML_FAIL = 'HTML 저장에 실패했습니다.';
 const HEAVY_IMAGE_CHARS = 400000;
 const $ = (id) => document.getElementById(id);
 
@@ -35,13 +35,16 @@ const initial = loadInitial();
 const state = {
   raw: structuredClone(initial.data),
   data: initial.data,
-  images: { art: null, icon: null },
-  out: { format: 'png', preset: '1x', customWidth: '' },
+  images: { art: null, icon: null }, // uploaded pictures as data URLs (memory only; they beat the stored addresses)
+  failed: { art: '', icon: '' }, // stored addresses the preview could not load (the built-in art is shown meanwhile)
+  out: { format: 'png', preset: '1x', customWidth: '', imageMode: 'embed' },
 };
 const styleElement = document.head.appendChild(document.createElement('style'));
 let appliedCss = '';
 let renderTimer = 0;
+let exporting = false; // one export at a time: a second click while the first still converts would download twice
 let form = null;
+const flow = createImageFlow({ state, setStatus, commit, render: renderPreview });
 
 function setStatus(text, kind = 'info') {
   const node = $('status');
@@ -83,12 +86,13 @@ function fitPreview() {
 function renderPreview() {
   const template = getTemplate(state.data.template);
   try {
-    const tree = toDom(template.render(buildViewModel(state.data, state.images)), document);
+    const tree = toDom(template.render(buildViewModel(state.data, flow.previewImages())), document);
     if (appliedCss !== template.id) {
       styleElement.textContent = `${COMMON_CSS}\n${template.css}`;
       appliedCss = template.id;
     }
     $('sheet-mount').replaceChildren(tree);
+    flow.watchPreview($('sheet-mount'));
   } catch (error) {
     console.warn('preview render failed', error);
     setStatus('미리보기를 그리지 못했습니다.', 'error');
@@ -99,8 +103,10 @@ function renderPreview() {
 
 function scheduleRender() {
   clearTimeout(renderTimer);
+  // Big uploads and remote pictures (requested again whenever their <img> is rebuilt) are drawn once per pause in typing.
   const heavy = (state.images.art || '').length + (state.images.icon || '').length > HEAVY_IMAGE_CHARS;
-  if (heavy) renderTimer = setTimeout(renderPreview, 90);
+  const remote = state.data.artUrl !== '' || state.data.iconUrl !== '';
+  if (heavy || remote) renderTimer = setTimeout(renderPreview, 90);
   else renderPreview();
 }
 
@@ -112,64 +118,68 @@ function commit() {
   saveNow();
 }
 
-async function uploadImage(kind, file) {
-  setStatus('이미지를 불러오는 중입니다…');
-  const result = await loadImageFile(file, kind === 'art' ? ART_MAX_SIDE : ICON_MAX_SIDE);
-  if (!result.ok) {
-    setStatus(`${result.error} 기존 ${IMAGE_LABELS[kind]}은(는) 그대로 유지됩니다.`, 'error');
-    return;
-  }
-  state.images[kind] = result.dataUrl;
-  setStatus(`${IMAGE_LABELS[kind]} 이미지를 적용했습니다 (${result.width}×${result.height}px).`, 'ok');
-  scheduleRender();
-}
-
-function removeImage(kind) {
-  state.images[kind] = null;
-  setStatus(`${IMAGE_LABELS[kind]} 이미지를 제거했습니다.`, 'ok');
-  scheduleRender();
-}
-
 const baseName = () => (state.data.name ? `캐릭터시트_${state.data.name}` : '캐릭터시트');
 
 async function exportImage() {
-  const template = getTemplate(state.data.template);
-  const { format, preset, customWidth } = state.out;
+  if (exporting) return;
+  exporting = true;
   setStatus('이미지를 만드는 중입니다…');
   try {
+    const images = await flow.embeddedImages(); // PNG/JPEG always carry their pictures, whatever the HTML option says
+    if (!images) return; // the status already explains why
+    const template = getTemplate(state.data.template);
+    const { format, preset, customWidth } = state.out;
     clearTimeout(renderTimer);
     renderPreview(); // the measured height must belong to the current data (a delayed render may still be pending)
     const base = measuredBase();
     const out = computeOutputSize(base, preset, customWidth);
-    const blob = await rasterize(template, buildViewModel(state.data, state.images), out, format, base);
+    const blob = await rasterize(template, buildViewModel(state.data, images), out, format, base);
     downloadBlob(blob, safeFilename(baseName(), format === 'jpeg' ? 'jpg' : 'png'));
     setStatus(`이미지를 저장했습니다 (${out.width} × ${out.height}px).`, 'ok');
   } catch (error) {
     console.warn('image export failed', error);
     setStatus(IMAGE_FAIL, 'error');
+  } finally {
+    exporting = false;
   }
 }
 
-function exportHtmlFile() {
-  const result = exportHtml(state.data, state.images, getTemplate(state.data.template));
-  if (!result.ok) {
-    setStatus(result.error, 'error');
-    return;
+async function exportHtmlFile() {
+  if (exporting) return;
+  exporting = true;
+  const imageMode = state.out.imageMode === 'link' ? 'link' : 'embed';
+  setStatus('HTML 파일을 만드는 중입니다…');
+  try {
+    const images = imageMode === 'link' ? flow.linkImages() : await flow.embeddedImages();
+    if (!images) return; // the status already explains why
+    const result = exportHtml(state.data, images, getTemplate(state.data.template), { imageMode });
+    if (!result.ok) {
+      setStatus(result.error, 'error');
+      return;
+    }
+    downloadText(result.html, safeFilename(baseName(), 'html'));
+    setStatus('HTML 파일을 저장했습니다.', 'ok');
+  } catch (error) {
+    console.warn('html export failed', error);
+    setStatus(HTML_FAIL, 'error');
+  } finally {
+    exporting = false;
   }
-  downloadText(result.html, safeFilename(baseName(), 'html'));
-  setStatus('HTML 파일을 저장했습니다.', 'ok');
 }
 
 function resetSample() {
   state.raw = structuredClone(sampleCharacter());
-  state.images = { art: null, icon: null };
+  flow.reset();
   commit();
   form.sync();
   setStatus('샘플 캐릭터로 초기화했습니다.', 'ok');
 }
 
 function init() {
-  const ctx = { state, commit, setStatus, baseSize: measuredBase, uploadImage, removeImage, exportImage, exportHtmlFile, resetSample };
+  const ctx = {
+    state, commit, setStatus, baseSize: measuredBase, exportImage, exportHtmlFile, resetSample,
+    uploadImage: flow.uploadImage, removeImage: flow.removeImage, applyImageUrl: flow.applyImageUrl, clearImageUrl: flow.clearImageUrl,
+  };
   form = buildForm($('form-root'), ctx);
   form.sync();
   renderPreview();

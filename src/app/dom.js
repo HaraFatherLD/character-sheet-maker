@@ -4,6 +4,7 @@ import { SVG_NS, SVG_TAGS, assertVNode, attrPairs } from '../core/vnode.js';
 
 /**
  * Build a DOM tree from a VNode. Shares validation (tag/attribute whitelists, style and src rules) with toHtml.
+ * Remote (https) pictures are requested with CORS, without cookies and without a referrer, like the export does.
  * @param {object|string} node VNode or text
  * @param {Document} doc
  * @param {boolean} [inSvg=false] internal: true while inside an svg subtree
@@ -14,7 +15,14 @@ export function toDom(node, doc, inSvg = false) {
   assertVNode(node);
   const svg = inSvg || node.tag === 'svg';
   const element = svg && SVG_TAGS.has(node.tag) ? doc.createElementNS(SVG_NS, node.tag) : doc.createElement(node.tag);
-  for (const [name, value] of attrPairs(node.attrs)) {
+  const pairs = attrPairs(node.attrs);
+  if (node.tag === 'img' && pairs.some(([name, value]) => name === 'src' && value.startsWith('https:'))) {
+    // Same request shape as the export's fetch, so a preview that works can also be embedded. These must be set
+    // before `src`, which starts the request.
+    element.crossOrigin = 'anonymous';
+    element.referrerPolicy = 'no-referrer';
+  }
+  for (const [name, value] of pairs) {
     if (name !== 'style') element.setAttribute(name, value);
   }
   if (node.attrs && node.attrs.style) {

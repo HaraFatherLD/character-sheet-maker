@@ -2,6 +2,7 @@
 // and drawn onto a canvas of the requested output size.
 import { SVG_NS, XHTML_NS, toXhtml } from '../core/vnode.js';
 import { COMMON_CSS } from '../core/common-css.js';
+import { assertRasterImages } from '../core/raster-guard.js';
 
 const ENCODE_TIMEOUT_MS = 30000;
 
@@ -40,7 +41,8 @@ function loadImage(url) {
 }
 
 /**
- * Render the sheet to an image Blob. Rejects on any failure (load error, SecurityError, null blob).
+ * Render the sheet to an image Blob. Rejects on any failure (load error, SecurityError, null blob), and at once when a
+ * picture is not an embedded data URL.
  * @param {{render: Function, css: string, size: {w: number, h: number|null}}} template
  * @param {object} vm
  * @param {{width: number, height: number}} out
@@ -49,6 +51,9 @@ function loadImage(url) {
  * @returns {Promise<Blob>}
  */
 export async function rasterize(template, vm, out, format, base = template.size) {
+  // An svg used as an image cannot load anything from the network: a remote picture would silently draw as a blank.
+  const guard = assertRasterImages({ art: vm.art?.src, icon: vm.icon?.src });
+  if (!guard.ok) throw new Error(guard.error);
   const svg = buildRasterSvg(template, vm, out, base);
   const image = await loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
   const canvas = document.createElement('canvas');

@@ -27,6 +27,8 @@ body { display: flex; flex-direction: column; min-height: 100vh; font-family: "M
 .app-form input[type="color"] { width: 48px; height: 34px; padding: 0; border: 1px solid #c4cada; border-radius: 6px; background: #fff; }
 .app-form :focus-visible { outline: 2px solid #3b5bdb; outline-offset: 1px; }
 .inline { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.url-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.app-form .url-row input[type="text"] { flex: 1 1 180px; width: auto; }
 
 .btn { padding: 7px 12px; font: inherit; font-size: 13.5px; color: #1f2430; cursor: pointer; background: #f4f5f9; border: 1px solid #c4cada; border-radius: 6px; }
 .btn:hover:not(:disabled) { background: #e9ecf4; }

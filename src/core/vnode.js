@@ -1,5 +1,6 @@
 // VNode tree: templates return plain data, never HTML strings. Serializers validate against whitelists.
 import { escapeHtml, escapeXml } from './escape.js';
+import { validateImageUrl } from './image-url.js';
 
 /** Tags a template may use. */
 export const ALLOWED_TAGS = new Set(('div span p h1 h2 h3 h4 ul ol li img section header footer figure figcaption '
@@ -43,12 +44,33 @@ export function h(tag, attrs, ...children) {
 }
 
 /**
- * True for a base64 png/jpeg/webp data URL; the only value an `src` attribute may hold.
+ * True for a base64 png/jpeg/webp data URL: a picture that travels inside the document.
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isDataImageSrc(value) {
+  return typeof value === 'string' && IMAGE_SRC.test(value);
+}
+
+/**
+ * True for an https address already in the form `validateImageUrl` returns (trimmed, normalised, no credentials). A
+ * value the URL parser would rewrite is refused, so what was checked is exactly what gets serialised.
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isHttpsImageSrc(value) {
+  if (typeof value !== 'string') return false;
+  const checked = validateImageUrl(value);
+  return checked.ok && checked.value === value;
+}
+
+/**
+ * True for a base64 png/jpeg/webp data URL or a validated https URL: the only values an `src` attribute may hold.
  * @param {unknown} value
  * @returns {boolean}
  */
 export function isImageSrc(value) {
-  return typeof value === 'string' && IMAGE_SRC.test(value);
+  return isDataImageSrc(value) || isHttpsImageSrc(value);
 }
 
 const hasForbidden = (text) => {
@@ -77,7 +99,7 @@ export function validateStyle(style) {
 function attrValue(name, value) {
   if (name === 'style') return validateStyle(value);
   if (name === 'src') {
-    if (!isImageSrc(value)) throw new Error('src must be a base64 png/jpeg/webp data URL');
+    if (!isImageSrc(value)) throw new Error('src must be a base64 png/jpeg/webp data URL or a normalised https URL');
     return value;
   }
   if (typeof value === 'number' && !Number.isFinite(value)) throw new Error(`non-finite number for ${name}`);

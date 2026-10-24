@@ -38,8 +38,17 @@ export function sampleCharacter() {
       { name: '별자리 항로', desc: '밤하늘의 별자리를 읽어 가장 안전한 항로를 찾아낸다.' },
     ],
     art: { fit: 'cover', focusX: 50, focusY: 30 },
+    artUrl: '',
+    iconUrl: '',
     labels: {},
     hidden: [],
+    ...sampleExtras(),
+  };
+}
+
+/** What a user adds on top of the basic fields: extra items, one custom block, block placement, palette overrides. */
+function sampleExtras() {
+  return {
     customFields: [
       { id: 'f-lantern', label: '애용품', value: '꺼지지 않는 등불' },
       { id: 'f-motto', label: '좌우명', value: '불빛은 꺼뜨리지 않는다' },

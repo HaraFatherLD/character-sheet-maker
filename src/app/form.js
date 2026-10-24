@@ -59,7 +59,7 @@ function profileSection(ctx, reg) {
 /**
  * Build the whole form into `root`.
  * @param {HTMLElement} root
- * @param {object} ctx controller: { state, commit, setStatus, baseSize, uploadImage, removeImage, exportImage, exportHtmlFile, resetSample }
+ * @param {object} ctx controller: { state, commit, setStatus, baseSize, uploadImage, removeImage, applyImageUrl, clearImageUrl, exportImage, exportHtmlFile, resetSample }
  * @returns {{refresh: () => void, sync: () => void, afterRender: () => void}} refresh updates state-derived UI; sync also assigns
  *   every control value; afterRender runs after each preview render (things that depend on the rendered height)
  */

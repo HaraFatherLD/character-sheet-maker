@@ -67,3 +67,13 @@
 
 ## 메타데이터 (v2)
 - v2 추가: 자동 9 | 반자동 8 → 전체 누계 40
+
+---
+# v3 Acceptance Predicates — 이미지 URL
+- [x] `AP-039` (≥3): validateImageUrl (학생증 AP-022와 동일 기준) — `test/ap-039.test.js`
+- [x] `AP-040` (≥2): normalizeCharacter artUrl/iconUrl — `test/ap-040.test.js`
+- [x] `AP-041` (≥2): vnode src — 검증된 https 허용(이스케이프), 그 외 throw — `test/ap-041.test.js`
+- [x] `AP-042` (≥4): exportHtml imageMode — embed CSP `img-src data:`·원격 이미지 거부·미지 모드=embed, link CSP `img-src data: https:`·14종 모두 ok, https는 img src·CSP에만, 위험 값 거부 — `test/ap-042.test.js`
+- [x] `AP-043b` (Auto, rev.2): assertRasterImages — `test/ap-043.test.js`
+- [x] `AP-043` (Semi): URL 일러스트·아이콘 → 미리보기 반영; "파일에 포함" HTML·이미지 저장은 CORS 허용 URL에서 성공, 거부 URL에서 안내 후 중단; "링크 유지" HTML은 거부 URL에서도 성공하고 열면 이미지 표시; 새로고침 후 URL 유지
+- [ ] `AP-044` (Semi): 배포 URL 200

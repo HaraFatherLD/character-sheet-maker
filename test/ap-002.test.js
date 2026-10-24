@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { normalizeCharacter, DEFAULT_STAT_LABELS, DEFAULT_LAYOUT } from '../src/core/schema.js';
 
 // v2 fields that normalisation always fills in for v1-shaped input.
-const V2_DEFAULTS = () => ({ labels: {}, hidden: [], customFields: [], customBlocks: [], layout: structuredClone(DEFAULT_LAYOUT), palettes: {} });
+const V2_DEFAULTS = () => ({ labels: {}, hidden: [], customFields: [], customBlocks: [], layout: structuredClone(DEFAULT_LAYOUT), palettes: {}, artUrl: '', iconUrl: '' });
 
 const base = () => ({
   template: 'scifi', accentColor: '#3366ff', statMode: 'trpg',
